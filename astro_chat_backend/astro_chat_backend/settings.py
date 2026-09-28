@@ -10,13 +10,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Load environment variables from .env file if present
 dotenv.load_dotenv(os.path.join(BASE_DIR, '.env'))
 
-# Quick-start development settings - unsuitable for production
+# Security
 SECRET_KEY = os.environ.get('SECRET_KEY', 'default-insecure-secret-key')
 
 DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
-# Allow all hosts in production or split from env variable
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
+# Allow all hosts in production
+ALLOWED_HOSTS = ['*']
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 
 # Application definition
