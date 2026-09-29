@@ -66,49 +66,50 @@ def get_ai_response(user_message: str) -> str:
         print("DEBUG: No API key found in environment variables (GROQ_API_KEY/AI_API_KEY). Using fallback response.")
         return generate_smart_astrology_response(user_message)
 
-    # Determine endpoint based on API key prefix
+    # Determine endpoint and models based on API key prefix
     if api_key.startswith('gsk_'):
         url = "https://api.groq.com/openai/v1/chat/completions"
-        model_name = "llama-3.1-8b-instant"
+        candidate_models = ["llama3-8b-8192", "llama3-70b-8192", "mixtral-8x7b-32768", "gemma2-9b-it"]
     else:
         url = "https://api.openai.com/v1/chat/completions"
-        model_name = "gpt-3.5-turbo"
-
-
-    print(f"DEBUG: Calling API endpoint: {url} with model: {model_name}")
+        candidate_models = ["gpt-3.5-turbo"]
 
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {api_key}",
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
     }
-    payload = {
-        "model": model_name,
-        "messages": [
-            {"role": "system", "content": ASTRO_SYSTEM_PROMPT},
-            {"role": "user", "content": user_message}
-        ],
-        "temperature": 0.7,
-        "max_tokens": 500
-    }
 
-    try:
-        data = json.dumps(payload).encode('utf-8')
-        req = urllib.request.Request(url, data=data, headers=headers, method='POST')
-        with urllib.request.urlopen(req, timeout=15) as response:
-            res_body = response.read().decode('utf-8')
-            res_json = json.loads(res_body)
-            print(f"DEBUG: Groq API response received successfully! Status: {response.status}")
-            choices = res_json.get('choices', [])
-            if choices and 'message' in choices[0]:
-                ai_text = choices[0]['message']['content'].strip()
-                print(f"DEBUG: Generated AI Text length: {len(ai_text)}")
-                return ai_text
-    except urllib.error.HTTPError as http_err:
-        error_body = http_err.read().decode('utf-8') if http_err.fp else ''
-        print(f"DEBUG ERROR: HTTPError {http_err.code} from Groq/OpenAI: {http_err.reason}. Body: {error_body}")
-    except Exception as e:
-        print(f"DEBUG ERROR: General Exception calling AI API: {type(e).__name__} - {e}")
+    for model_name in candidate_models:
+        print(f"DEBUG: Trying Groq/AI model: {model_name}")
+        payload = {
+            "model": model_name,
+            "messages": [
+                {"role": "system", "content": ASTRO_SYSTEM_PROMPT},
+                {"role": "user", "content": user_message}
+            ],
+            "temperature": 0.7,
+            "max_tokens": 500
+        }
+
+        try:
+            data = json.dumps(payload).encode('utf-8')
+            req = urllib.request.Request(url, data=data, headers=headers, method='POST')
+            with urllib.request.urlopen(req, timeout=15) as response:
+                res_body = response.read().decode('utf-8')
+                res_json = json.loads(res_body)
+                print(f"DEBUG: Groq API response SUCCESS with model: {model_name}! Status: {response.status}")
+                choices = res_json.get('choices', [])
+                if choices and 'message' in choices[0]:
+                    ai_text = choices[0]['message']['content'].strip()
+                    print(f"DEBUG: Generated AI Text length: {len(ai_text)}")
+                    return ai_text
+        except urllib.error.HTTPError as http_err:
+            error_body = http_err.read().decode('utf-8') if http_err.fp else ''
+            print(f"DEBUG ERROR ({model_name}): HTTPError {http_err.code}: {http_err.reason}. Body: {error_body}")
+        except Exception as e:
+            print(f"DEBUG ERROR ({model_name}): General Exception: {type(e).__name__} - {e}")
+
 
     print("DEBUG: Falling back to smart generator due to API error/failure.")
     return generate_smart_astrology_response(user_message)
