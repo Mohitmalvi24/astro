@@ -69,10 +69,11 @@ def get_ai_response(user_message: str) -> str:
     # Determine endpoint based on API key prefix
     if api_key.startswith('gsk_'):
         url = "https://api.groq.com/openai/v1/chat/completions"
-        model_name = "llama-3.3-70b-versatile"
+        model_name = "llama-3.1-8b-instant"
     else:
         url = "https://api.openai.com/v1/chat/completions"
         model_name = "gpt-3.5-turbo"
+
 
     print(f"DEBUG: Calling API endpoint: {url} with model: {model_name}")
 
