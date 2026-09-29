@@ -66,19 +66,33 @@ def get_ai_response(user_message: str) -> str:
         print("DEBUG: No API key found in environment variables (GROQ_API_KEY/AI_API_KEY). Using fallback response.")
         return generate_smart_astrology_response(user_message)
 
-    # Determine endpoint and models based on API key prefix
-    if api_key.startswith('gsk_'):
-        url = "https://api.groq.com/openai/v1/chat/completions"
-        candidate_models = ["llama3-8b-8192", "llama3-70b-8192", "mixtral-8x7b-32768", "gemma2-9b-it"]
-    else:
-        url = "https://api.openai.com/v1/chat/completions"
-        candidate_models = ["gpt-3.5-turbo"]
-
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {api_key}",
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
     }
+
+    # If Groq Key, query active models dynamically from Groq
+    candidate_models = []
+    if api_key.startswith('gsk_'):
+        models_url = "https://api.groq.com/openai/v1/models"
+        try:
+            req_m = urllib.request.Request(models_url, headers=headers, method='GET')
+            with urllib.request.urlopen(req_m, timeout=10) as resp_m:
+                m_body = json.loads(resp_m.read().decode('utf-8'))
+                data_list = m_body.get('data', [])
+                candidate_models = [m['id'] for m in data_list if 'id' in m]
+                print(f"DEBUG: Dynamically fetched active Groq models: {candidate_models[:5]}")
+        except Exception as err_m:
+            print(f"DEBUG ERROR fetching models list: {err_m}")
+        
+        if not candidate_models:
+            candidate_models = ["llama-3.3-70b-specdec", "llama-3.1-70b-versatile", "llama-3.2-3b-preview", "qwen-2.5-coder-32b"]
+        
+        url = "https://api.groq.com/openai/v1/chat/completions"
+    else:
+        url = "https://api.openai.com/v1/chat/completions"
+        candidate_models = ["gpt-3.5-turbo"]
 
     for model_name in candidate_models:
         print(f"DEBUG: Trying Groq/AI model: {model_name}")
@@ -110,9 +124,9 @@ def get_ai_response(user_message: str) -> str:
         except Exception as e:
             print(f"DEBUG ERROR ({model_name}): General Exception: {type(e).__name__} - {e}")
 
-
     print("DEBUG: Falling back to smart generator due to API error/failure.")
     return generate_smart_astrology_response(user_message)
+
 
 
 
