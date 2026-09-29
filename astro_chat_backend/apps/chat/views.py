@@ -55,18 +55,25 @@ def generate_smart_astrology_response(prompt: str) -> str:
 
 
 def get_ai_response(user_message: str) -> str:
-    api_key = os.environ.get('AI_API_KEY', '')
+    # Check for Groq API Key or General AI API Key
+    api_key = os.environ.get('GROQ_API_KEY', '') or os.environ.get('AI_API_KEY', '')
     if not api_key:
         return generate_smart_astrology_response(user_message)
 
-    # Standard OpenAI-compatible format or Gemini endpoint fallback
-    url = "https://api.openai.com/v1/chat/completions"
+    # Determine endpoint based on API key prefix
+    if api_key.startswith('gsk_'):
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        model_name = "llama-3.3-70b-versatile"
+    else:
+        url = "https://api.openai.com/v1/chat/completions"
+        model_name = "gpt-3.5-turbo"
+
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {api_key}"
     }
     payload = {
-        "model": "gpt-3.5-turbo",
+        "model": model_name,
         "messages": [
             {"role": "system", "content": ASTRO_SYSTEM_PROMPT},
             {"role": "user", "content": user_message}
@@ -78,7 +85,7 @@ def get_ai_response(user_message: str) -> str:
     try:
         data = json.dumps(payload).encode('utf-8')
         req = urllib.request.Request(url, data=data, headers=headers, method='POST')
-        with urllib.request.urlopen(req, timeout=10) as response:
+        with urllib.request.urlopen(req, timeout=12) as response:
             res_body = response.read().decode('utf-8')
             res_json = json.loads(res_body)
             choices = res_json.get('choices', [])
@@ -88,6 +95,7 @@ def get_ai_response(user_message: str) -> str:
         print(f"AI API call exception: {e}")
 
     return generate_smart_astrology_response(user_message)
+
 
 
 
