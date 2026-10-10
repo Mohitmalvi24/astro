@@ -1,0 +1,7 @@
+# Sensitive credential files
+firebase-service-account.json
+*.json.secret
+.env
+db.sqlite3
+__pycache__/
+*.pyc
