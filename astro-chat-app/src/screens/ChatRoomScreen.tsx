@@ -11,11 +11,14 @@ import {
   StatusBar,
   ScrollView,
   ActivityIndicator,
+  Keyboard,
+  Animated,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { theme } from '../theme/theme';
 import { chatApi, ChatMessageItem } from '../api/chat';
+import { SafeStorage } from '../utils/storage';
 
 const BackIcon = ({ color = '#0F172A', size = 22 }: { color?: string; size?: number }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
@@ -82,15 +85,86 @@ const SUGGESTIONS = [
 
 export const ChatRoomScreen = ({ route, navigation }: any) => {
   const astrologerName = route?.params?.astrologerName || 'Meera';
+  const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+  const [birthDetails, setBirthDetails] = useState<{ birthDate: string; birthPlace: string }>({
+    birthDate: 'DD Mon YYYY',
+    birthPlace: 'City',
+  });
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const keyboardHeightAnim = useRef(new Animated.Value(0)).current;
   const scrollViewRef = useRef<ScrollView>(null);
 
   useEffect(() => {
     loadChatHistory();
+    loadOnboardingDetails();
+
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSub = Keyboard.addListener(showEvent, (e) => {
+      setIsKeyboardVisible(true);
+      // Extra clearance so it floats comfortably above keyboard
+      const targetHeight = e.endCoordinates.height + 50;
+      Animated.timing(keyboardHeightAnim, {
+        toValue: targetHeight,
+        duration: Platform.OS === 'ios' ? (e.duration || 250) : 200,
+        useNativeDriver: false,
+      }).start(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      });
+    });
+
+    const hideSub = Keyboard.addListener(hideEvent, (e) => {
+      setIsKeyboardVisible(false);
+      Animated.timing(keyboardHeightAnim, {
+        toValue: 0,
+        duration: Platform.OS === 'ios' ? (e.duration || 200) : 200,
+        useNativeDriver: false,
+      }).start();
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
   }, []);
+
+  const loadOnboardingDetails = async () => {
+    try {
+      const stored = await SafeStorage.getItem('onboarding_data');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        let formattedDate = 'DD Mon YYYY';
+        if (parsed.birthDate) {
+          // Format "YYYY-MM-DD" -> "DD Mon YYYY" (e.g., 24 Oct 1999)
+          const parts = parsed.birthDate.split('-');
+          if (parts.length === 3) {
+            const year = parseInt(parts[0], 10);
+            const month = parseInt(parts[1], 10) - 1;
+            const day = parseInt(parts[2], 10);
+            const d = new Date(year, month, day);
+            if (!isNaN(d.getTime())) {
+              formattedDate = d.toLocaleDateString('en-GB', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric',
+              });
+            }
+          }
+        }
+        setBirthDetails({
+          birthDate: formattedDate,
+          birthPlace: parsed.birthPlace || 'City',
+        });
+      }
+    } catch (e) {
+      console.warn('Failed to load onboarding details:', e);
+    }
+  };
 
   const loadChatHistory = async () => {
     try {
@@ -200,15 +274,20 @@ export const ChatRoomScreen = ({ route, navigation }: any) => {
         </TouchableOpacity>
       </View>
 
-      <KeyboardAvoidingView
-        style={styles.keyboardContainer}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      <Animated.View
+        style={[
+          styles.keyboardContainer,
+          {
+            paddingBottom: keyboardHeightAnim,
+          },
+        ]}
       >
         <ScrollView
           ref={scrollViewRef}
           style={styles.chatScroll}
           contentContainerStyle={styles.chatContent}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
           onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
         >
           {/* Today Divider Pill */}
@@ -224,15 +303,11 @@ export const ChatRoomScreen = ({ route, navigation }: any) => {
             <View style={styles.detailsRow}>
               <View style={styles.detailCol}>
                 <Text style={styles.detailLabel}>Born</Text>
-                <Text style={styles.detailValue}>DD Mon YYYY</Text>
-              </View>
-              <View style={styles.detailCol}>
-                <Text style={styles.detailLabel}>Time</Text>
-                <Text style={styles.detailValue}>HH:MM</Text>
+                <Text style={styles.detailValue}>{birthDetails.birthDate}</Text>
               </View>
               <View style={styles.detailCol}>
                 <Text style={styles.detailLabel}>Place</Text>
-                <Text style={styles.detailValue}>City</Text>
+                <Text style={styles.detailValue}>{birthDetails.birthPlace}</Text>
               </View>
             </View>
           </View>
@@ -290,7 +365,16 @@ export const ChatRoomScreen = ({ route, navigation }: any) => {
         </View>
 
         {/* Bottom Input Bar */}
-        <View style={styles.inputArea}>
+        <View
+          style={[
+            styles.inputArea,
+            {
+              paddingBottom: isKeyboardVisible
+                ? 10
+                : Math.max(insets.bottom, Platform.OS === 'android' ? 28 : 12) + 8,
+            },
+          ]}
+        >
           <TouchableOpacity style={styles.plusIconBtn}>
             <PlusIcon size={22} color="#64748B" />
           </TouchableOpacity>
@@ -301,6 +385,11 @@ export const ChatRoomScreen = ({ route, navigation }: any) => {
             onChangeText={setInputText}
             placeholder="Type your question..."
             placeholderTextColor="#94A3B8"
+            onFocus={() => {
+              setTimeout(() => {
+                scrollViewRef.current?.scrollToEnd({ animated: true });
+              }, 150);
+            }}
           />
 
           <TouchableOpacity
@@ -311,7 +400,7 @@ export const ChatRoomScreen = ({ route, navigation }: any) => {
             <SendUpIcon size={18} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
-      </KeyboardAvoidingView>
+      </Animated.View>
     </SafeAreaView>
   );
 };
