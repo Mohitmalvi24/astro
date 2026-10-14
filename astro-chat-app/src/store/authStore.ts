@@ -14,6 +14,7 @@ interface AuthState {
   accessToken: string | null;
   refreshToken: string | null;
   isAuthenticated: boolean;
+  needsOnboarding: boolean;
   isLoading: boolean;
   error: string | null;
 
@@ -21,6 +22,7 @@ interface AuthState {
   register: (payload: RegisterPayload) => Promise<void>;
   logout: () => Promise<void>;
   loadStorageTokens: () => Promise<void>;
+  completeOnboarding: () => void;
   clearError: () => void;
 }
 
@@ -29,6 +31,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   accessToken: null,
   refreshToken: null,
   isAuthenticated: false,
+  needsOnboarding: false,
   isLoading: true,
   error: null,
 
@@ -47,6 +50,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           isAuthenticated: true,
           isLoading: false,
         });
+        notificationsApi.registerPushToken().catch(console.error);
       } else {
         set({ isAuthenticated: false, isLoading: false });
       }
@@ -119,9 +123,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         accessToken: access,
         refreshToken: refresh,
         user,
-        isAuthenticated: !!access,
+        isAuthenticated: false,
+        needsOnboarding: !!access,
         isLoading: false,
       });
+
+      if (access) {
+        notificationsApi.registerPushToken().catch(console.error);
+      }
     } catch (err: any) {
       console.error('Registration Error:', err);
       const data = err.response?.data;
@@ -156,6 +165,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       isAuthenticated: false,
       error: null,
     });
+  },
+
+  completeOnboarding: () => {
+    set({ isAuthenticated: true, needsOnboarding: false });
   },
 
   clearError: () => set({ error: null }),

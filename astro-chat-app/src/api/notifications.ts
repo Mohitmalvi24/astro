@@ -2,6 +2,7 @@ import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import { api } from './auth';
+import { SafeStorage } from '../utils/storage';
 
 // Helper to safely get Notifications module
 const getNotificationsModule = () => {
@@ -67,34 +68,43 @@ export const notificationsApi = {
         return null;
       }
 
-      // Fetch Token (Safely try Expo Push Token first, then native fallback)
+      // Fetch Token (Prioritize Native FCM Token for direct Firebase Console Notifications)
       let token = '';
       try {
-        const projectId = Constants.expoConfig?.extra?.eas?.projectId;
-        const tokenData = await NotificationsModule.getExpoPushTokenAsync({
-          projectId: projectId,
-        });
-        token = tokenData.data;
-        console.log('Push Token:', token);
-      } catch (err: any) {
-        console.warn('Expo push token failed (Firebase setup required):', err?.message || err);
+        const deviceToken = await NotificationsModule.getDevicePushTokenAsync();
+        token = deviceToken.data;
+        console.log(' Device Native FCM Token:', token);
+      } catch (fcmErr: any) {
+        console.warn('Native FCM token fallback to Expo Push Token:', fcmErr?.message || fcmErr);
         try {
-          const deviceToken = await NotificationsModule.getDevicePushTokenAsync();
-          token = deviceToken.data;
-          console.log('Device Native FCM Token:', token);
-        } catch (fcmErr: any) {
-          console.warn('Native FCM token error (google-services.json missing):', fcmErr?.message || fcmErr);
+          const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+          const tokenData = await NotificationsModule.getExpoPushTokenAsync({
+            projectId: projectId,
+          });
+          token = tokenData.data;
+          console.log(' Expo Push Token:', token);
+        } catch (expoErr: any) {
+          console.warn('Expo push token error:', expoErr?.message || expoErr);
           return null;
         }
       }
 
-      // Send token to backend API if token was acquired
+      // Send token to backend API only if user is logged in
       if (token) {
-        await api.post('/notifications/register-token', {
-          token: token,
-          platform: Platform.OS,
-        });
-        console.log('Push Token successfully registered with backend server.');
+        const accessToken = await SafeStorage.getItem('access_token');
+        if (accessToken) {
+          try {
+            await api.post('/notifications/register-token', {
+              token: token,
+              platform: Platform.OS,
+            });
+            console.log('Push Token successfully registered with backend server.');
+          } catch (apiErr: any) {
+            console.warn('Backend push token registration failed:', apiErr?.response?.status || apiErr?.message);
+          }
+        } else {
+          console.log('Push Token acquired (will register with backend upon login).');
+        }
       }
 
       return token;

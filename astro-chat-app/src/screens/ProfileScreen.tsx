@@ -4,25 +4,35 @@ import {
   View,
   Text,
   TouchableOpacity,
-  SafeAreaView,
   Switch,
   Alert,
+  StatusBar,
 } from 'react-native';
-import Svg, { Path, Circle } from 'react-native-svg';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import { theme } from '../theme/theme';
 import { useAuthStore } from '../store/authStore';
 import { notificationsApi } from '../api/notifications';
 
-const UserAvatarIcon = ({ color = theme.colors.accent, size = 36 }: { color?: string; size?: number }) => (
+const UserAvatarPlaceholder = ({ size = 80, color = '#DBEAFE', iconColor = '#2563EB' }: { size?: number; color?: string; iconColor?: string }) => (
+  <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: color, justifyContent: 'center', alignItems: 'center' }}>
+    <Svg width={size * 0.55} height={size * 0.55} viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+      <Circle cx="12" cy="7" r="4" />
+    </Svg>
+  </View>
+);
+
+const ChevronRightIcon = ({ color = '#64748B', size = 18 }: { color?: string; size?: number }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-    <Path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-    <Circle cx="12" cy="7" r="4" />
+    <Path d="M9 18l6-6-6-6" />
   </Svg>
 );
 
-const ChevronRightIcon = ({ color = theme.colors.textSecondary, size = 18 }: { color?: string; size?: number }) => (
+const WalletIcon = ({ color = '#2563EB', size = 20 }: { color?: string; size?: number }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-    <Path d="M9 18l6-6-6-6" />
+    <Rect x="2" y="5" width="20" height="14" rx="3" />
+    <Path d="M16 12h.01" />
   </Svg>
 );
 
@@ -46,52 +56,62 @@ export const ProfileScreen = () => {
     try {
       await notificationsApi.toggleDailyReminder(val);
     } catch (e) {
-      setReminderEnabled(!val); // revert on error
+      setReminderEnabled(!val);
     }
   };
 
   const handleChangePassword = () => {
-    Alert.alert('Change Password', 'Password change feature will be available in settings update.');
+    Alert.alert('Change Password', 'Password change feature will be available in the next update.');
   };
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
       <View style={styles.content}>
         {/* Profile Heading */}
         <Text style={styles.heading}>Profile</Text>
 
-        {/* Centered Avatar Section */}
+        {/* Centered Avatar Card */}
         <View style={styles.avatarSection}>
-          <View style={styles.avatarCircle}>
-            <UserAvatarIcon color={theme.colors.accent} size={40} />
-          </View>
-          <Text style={styles.userName}>{user?.username || user?.email?.split('@')[0] || 'Explorer'}</Text>
-          <Text style={styles.userEmail}>{user?.email}</Text>
+          <UserAvatarPlaceholder size={84} color="#DBEAFE" iconColor="#2563EB" />
+          <Text style={styles.userName}>{user?.username || 'manoti'}</Text>
+          <Text style={styles.userEmail}>{user?.email || 'user@example.com'}</Text>
         </View>
 
-        {/* Action Rows */}
+        {/* Wallet Balance Card */}
+        <View style={styles.walletCard}>
+          <View style={styles.walletLeft}>
+            <View style={styles.walletIconCircle}>
+              <WalletIcon size={20} color="#2563EB" />
+            </View>
+            <View>
+              <Text style={styles.walletTitle}>Wallet Balance</Text>
+              <Text style={styles.walletSub}>Available for chats</Text>
+            </View>
+          </View>
+          <Text style={styles.walletValue}>₹ 150</Text>
+        </View>
+
+        {/* Settings Rows */}
         <View style={styles.rowsContainer}>
-          {/* Row 1: Daily Reminder */}
           <View style={styles.row}>
             <Text style={styles.rowLabel}>Daily reminder</Text>
             <Switch
               value={reminderEnabled}
               onValueChange={handleToggleReminder}
-              trackColor={{ false: theme.colors.border, true: theme.colors.accent }}
-              thumbColor={theme.colors.background}
+              trackColor={{ false: '#E2E8F0', true: '#2563EB' }}
+              thumbColor={'#FFFFFF'}
             />
           </View>
 
-          {/* Row 2: Change Password */}
           <TouchableOpacity style={styles.row} onPress={handleChangePassword} activeOpacity={0.7}>
             <Text style={styles.rowLabel}>Change password</Text>
-            <ChevronRightIcon color={theme.colors.textSecondary} size={18} />
+            <ChevronRightIcon color="#64748B" size={18} />
           </TouchableOpacity>
 
-          {/* Row 3: Log Out */}
           <TouchableOpacity style={styles.row} onPress={logout} activeOpacity={0.7}>
             <Text style={[styles.rowLabel, styles.logoutLabel]}>Log out</Text>
-            <ChevronRightIcon color={theme.colors.accent} size={18} />
+            <ChevronRightIcon color="#DC2626" size={18} />
           </TouchableOpacity>
         </View>
       </View>
@@ -102,65 +122,92 @@ export const ProfileScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: '#FFFFFF',
   },
   content: {
     flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: 32,
+    paddingHorizontal: 20,
+    paddingTop: 16,
   },
   heading: {
     fontFamily: theme.typography.fontFamilyHeading,
-    fontSize: 34,
-    color: theme.colors.textPrimary,
-    marginBottom: 24,
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: 20,
   },
   avatarSection: {
     alignItems: 'center',
-    marginBottom: 32,
-  },
-  avatarCircle: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: theme.colors.chatBubbleIncoming, // beige circle
-    borderWidth: 2,
-    borderColor: theme.colors.accent, // terracotta border
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 24,
   },
   userName: {
-    fontFamily: theme.typography.fontFamilyHeading,
-    fontSize: 22,
-    color: theme.colors.textPrimary,
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginTop: 12,
   },
   userEmail: {
-    fontFamily: theme.typography.fontFamilyBody,
     fontSize: 14,
-    color: theme.colors.textSecondary,
-    marginTop: 4,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  walletCard: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#EEF2FF',
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 20,
+  },
+  walletLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  walletIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  walletTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  walletSub: {
+    fontSize: 12,
+    color: '#64748B',
+  },
+  walletValue: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#2563EB',
   },
   rowsContainer: {
-    gap: 14,
+    gap: 10,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: theme.colors.chatBubbleIncoming, // light beige row
-    borderRadius: theme.borderRadius.card,
-    paddingVertical: 16,
-    paddingHorizontal: 20,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingVertical: 14,
+    paddingHorizontal: 18,
   },
   rowLabel: {
-    fontFamily: theme.typography.fontFamilyBody,
-    fontSize: 16,
-    color: theme.colors.textPrimary,
-    fontWeight: '500',
+    fontSize: 15,
+    color: '#0F172A',
+    fontWeight: '600',
   },
   logoutLabel: {
-    color: theme.colors.accent,
+    color: '#DC2626',
     fontWeight: '600',
   },
 });
